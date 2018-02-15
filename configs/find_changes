@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+
+usage() {
+    echo "Usage: ${0/*\//} [OPTIONS] <server>"
+    echo
+    echo "Find changes between the template and a server's configs"
+    echo
+    echo "Options:"
+    echo "    -h, --help    Display this help message"
+    echo
+    exit $1
+}
+
+declare -a args
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        "--") shift && args+=("$@") && break ;;
+        "-h"|"--help") usage 0 ;;
+        *) args+=("$1") ;;
+    esac
+    shift
+done
+[[ -z ${args[@]} ]] || set -- "${args[@]}"
+
+[[ $# -eq 1 ]] || usage 1
+[[ -d runtime/$1 ]] || usage 2
+
+vimdiff \
+    <(
+        find template -maxdepth 1 -name "*.conf" -type f \
+        -exec md5sum {} +
+    ) \
+    <(
+        find runtime/$1 -maxdepth 1 -name "*.conf" -type f \
+        -exec md5sum {} +
+    )

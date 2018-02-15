@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+
+function irc() {
+    irc_cleanup() {
+        unset args configs noconnect runtime template
+        unset -f irc_cleanup irc_usage
+    }
+
+    irc_usage() {
+        echo "Usage: irc [OPTIONS] <server>"
+        echo
+        echo "Create config directory and start Weechat"
+        echo
+        echo "Options:"
+        echo "    -a, --no-connect    Disable auto-connect"
+        echo "    -h, --help          Display this help message"
+        echo
+        irc_cleanup
+    }
+
+    declare -a args
+    unset noconnect
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            "--") shift && args+=("$@") && break ;;
+            "-a"|"--no-connect") noconnect="--no-connect" ;;
+            "-h"|"--help") irc_usage; return 0 ;;
+            *) args+=("$1") ;;
+        esac
+        shift
+    done
+    [[ -z ${args[@]} ]] || set -- "${args[@]}"
+
+    [[ $# -ne 1 ]] && irc_usage && return 1
+
+    configs="$HOME/.weechat/configs"
+    runtime="$configs/runtime"
+    template="$configs/template"
+
+    if [[ ! -f $configs/$1/irc.conf ]] ||
+       [[ ! -f $configs/$1/sec.conf ]]
+    then
+        echo "No $1.conf exists"
+        return 2
+    fi
+
+    # Ensure runtime directory exists
+    mkdir -p $runtime
+
+    # Cleanup if files leftover
+    rm -rf $runtime/$1
+
+    # Setup configs
+    cp -r $template $runtime/$1
+    cat $configs/$1/irc.conf >>$runtime/$1/irc.conf
+    ln -s $configs/$1/sec.conf $runtime/$1/sec.conf
+
+    # Run weechat
+    if [[ -n $TMUX ]]; then
+        TERM="tmux-256color" weechat $noconnect --dir $runtime/$1
+    else
+        weechat $noconnect --dir $runtime/$1
+    fi
+
+    # Cleanup
+    rm -rf $runtime/$1
+
+    irc_cleanup
+}
+
+if [[ -n ${BASH_SOURCE[0]} ]]; then
+    case "$0" in
+        *"bash") ;;
+        *) irc "$@" ;;
+    esac
+fi
