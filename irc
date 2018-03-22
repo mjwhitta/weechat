@@ -9,7 +9,7 @@ function irc() {
     irc_usage() {
         echo "Usage: irc [OPTIONS] <server>"
         echo
-        echo "Create config directory and start Weechat"
+        echo "Create runtime configs and start Weechat"
         echo
         echo "Options:"
         echo "    -a, --no-connect    Disable auto-connect"
