@@ -25,12 +25,15 @@ warn() { echo -e "${color:+\e[33m}[-] $*\e[0m"; }
 
 usage() {
     cat <<EOF
-Usage: ${0##*/} [OPTIONS] <server>
+Usage: ${0##*/} [OPTIONS]
 
-Find changes between the template and a server's configs
+Install or uninstall irc script
 
 Options:
-    -h, --help    Display this help message
+    -d, --dir=INSTALL_DIR    Install to specified directory
+    -h, --help               Display this help message
+    --nocolor                Disable colorized output
+    -u, --uninstall          Uninstall
 
 EOF
     exit "$1"
@@ -38,8 +41,10 @@ EOF
 
 declare -a args deps
 unset help
+action="install"
+bin="irc"
 color="true"
-# deps+=("todo")
+install_dir="$HOME/.local/bin"
 
 # Check for missing dependencies
 check_deps
@@ -48,8 +53,10 @@ check_deps
 while [[ $# -gt 0 ]]; do
     case "$1" in
         "--") shift && args+=("$@") && break ;;
+        "-d"|"--dir"*) install_dir="$(long_opt "$@")" || shift ;;
         "-h"|"--help") help="true" ;;
         "--nocolor") unset color ;;
+        "-u"|"--uninstall") action="uninstall" ;;
         *) args+=("$1") ;;
     esac
     shift
@@ -58,15 +65,27 @@ done
 
 # Check for valid params
 [[ -z $help ]] || usage 0
-[[ $# -eq 1 ]] || usage 1
-[[ -d runtime/$1 ]] || usage 2
+[[ $# -eq 0 ]] || usage 1
 
-vimdiff \
-    <(
-        find template -maxdepth 1 -name "*.conf" -type f \
-        -exec md5sum {} +
-    ) \
-    <(
-        find runtime/$1 -maxdepth 1 -name "*.conf" -type f \
-        -exec md5sum {} +
-    )
+unset sudo
+case "$action" in
+    "install")
+        info "Installing..."
+        mkdir -p "$install_dir"
+        [[ -w $install_dir ]] || sudo="sudo"
+        $sudo install -m 755 $bin "$install_dir/$bin"
+        $sudo sed -i -e "s#INSTALL_DIR#$(pwd)#g" "$install_dir/$bin"
+        ;;
+    "uninstall")
+        if [[ -f $install_dir/$bin ]]; then
+            info "Uninstalling..."
+            [[ -w $install_dir ]] || sudo="sudo"
+            $sudo rm -f "$install_dir/$bin"
+        else
+            errx 2 "$bin is not installed in $install_dir"
+        fi
+        ;;
+    *) usage 3 ;;
+esac
+good "Success"
+info "Done"

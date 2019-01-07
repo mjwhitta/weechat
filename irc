@@ -1,77 +1,97 @@
 #!/usr/bin/env bash
 
-function irc() {
-    irc_cleanup() {
-        unset args configs noconnect runtime template
-        unset -f irc_cleanup irc_usage
-    }
+### Helpers begin
+check_deps() {
+    for d in "${deps[@]}"; do
+        [[ -n $(command -v "$d") ]] || errx 128 "$d is not installed"
+    done; unset d
+}
+err() { echo -e "${color:+\e[31m}[!] $*\e[0m"; }
+errx() { echo -e "${color:+\e[31m}[!] ${*:2}\e[0m"; exit "$1"; }
+good() { echo -e "${color:+\e[32m}[+] $*\e[0m"; }
+info() { echo -e "${color:+\e[37m}[*] $*\e[0m"; }
+long_opt() {
+    local arg shift="0"
+    case "$1" in
+        "--"*"="*) arg="${1#*=}"; [[ -n $arg ]] || usage 127 ;;
+        *) shift="1"; shift; [[ $# -gt 0 ]] || usage 127; arg="$1" ;;
+    esac
+    echo "$arg"
+    return $shift
+}
+subinfo() { echo -e "${color:+\e[36m}[=] $*\e[0m"; }
+warn() { echo -e "${color:+\e[33m}[-] $*\e[0m"; }
+### Helpers end
 
-    irc_usage() {
-        echo "Usage: irc [OPTIONS] <server>"
-        echo
-        echo "Create runtime configs and start Weechat"
-        echo
-        echo "Options:"
-        echo "    -a, --no-connect    Disable auto-connect"
-        echo "    -h, --help          Display this help message"
-        echo
-        irc_cleanup
-    }
+usage() {
+    cat <<EOF
+Usage: ${0##*/} [OPTIONS] <server>
 
-    declare -a args
-    unset noconnect
+Create runtime configs and start Weechat
 
-    while [[ $# -gt 0 ]]; do
-        case "$1" in
-            "--") shift && args+=("$@") && break ;;
-            "-a"|"--no-connect") noconnect="--no-connect" ;;
-            "-h"|"--help") irc_usage; return 0 ;;
-            *) args+=("$1") ;;
-        esac
-        shift
-    done
-    [[ -z ${args[@]} ]] || set -- "${args[@]}"
+Options:
+    -a, --no-connect    Disable auto-connect
+    -h, --help          Display this help message
+    --nocolor           Disable colorized output
 
-    [[ $# -ne 1 ]] && irc_usage && return 1
-
-    configs="$HOME/.weechat/configs"
-    runtime="$configs/runtime"
-    template="$configs/template"
-
-    if [[ ! -f $configs/$1/irc.conf ]] ||
-       [[ ! -f $configs/$1/sec.conf ]]
-    then
-        echo "No $1.conf exists"
-        return 2
-    fi
-
-    # Ensure runtime directory exists
-    mkdir -p $runtime
-
-    # Cleanup if files leftover
-    rm -rf $runtime/$1
-
-    # Setup configs
-    cp -r $template $runtime/$1
-    cat $configs/$1/irc.conf >>$runtime/$1/irc.conf
-    ln -s $configs/$1/sec.conf $runtime/$1/sec.conf
-
-    # Run weechat
-    if [[ -n $TMUX ]]; then
-        TERM="tmux-256color" weechat $noconnect --dir $runtime/$1
-    else
-        weechat $noconnect --dir $runtime/$1
-    fi
-
-    # Cleanup
-    rm -rf $runtime/$1
-
-    irc_cleanup
+EOF
+    exit "$1"
 }
 
-if [[ -n ${BASH_SOURCE[0]} ]]; then
-    case "$0" in
-        *"bash") ;;
-        *) irc "$@" ;;
+declare -a args deps
+unset help noconnect
+color="true"
+configs="INSTALL_DIR/configs"
+# deps+=("todo")
+runtime="$configs/runtime"
+template="$configs/template"
+
+# Check for missing dependencies
+check_deps
+
+# Parse command line options
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        "--") shift && args+=("$@") && break ;;
+        "-a"|"--no-connect") noconnect="--no-connect" ;;
+        "-h"|"--help") help="true" ;;
+        "--nocolor") unset color ;;
+        *) args+=("$1") ;;
     esac
+    shift
+done
+[[ ${#args[@]} -eq 0 ]] || set -- "${args[@]}"
+
+# Check for valid params
+[[ -z $help ]] || usage 0
+[[ $# -eq 1 ]] || usage 1
+
+# These are needed at a minimum
+[[ -f $configs/$1/irc.conf ]] || errx 2 "No $1/irc.conf exists"
+[[ -f $configs/$1/sec.conf ]] || errx 3 "No $1/sec.conf exists"
+
+# Ensure runtime directory exists
+mkdir -p $runtime
+
+# Cleanup if files leftover
+rm -rf $runtime/$1
+
+# Setup configs
+cp -r $template $runtime/$1
+while read -r conf; do
+    case "$conf" in
+        *"irc.conf") cat $conf >>$runtime/$1/irc.conf ;;
+        *"sec.conf") ln -s $conf $runtime/$1/sec.conf ;;
+        *) cp -f $conf $runtime/$1/ ;;
+    esac
+done < <(find $configs/$1/ -maxdepth 1 -type f)
+
+# Run weechat
+if [[ -n $TMUX ]]; then
+    TERM="tmux-256color" weechat $noconnect --dir $runtime/$1
+else
+    weechat $noconnect --dir $runtime/$1
 fi
+
+# Cleanup
+rm -rf $runtime/$1

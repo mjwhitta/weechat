@@ -11,14 +11,8 @@ Open all the conf files with your editor of choice and fill in the
 needed variables. Then start weechat with your config like so:
 
 ```
-$ source $HOME/.weechat/irc
+$ ./installer
 $ irc -a server
-```
-
-or
-
-```
-$ $HOME/.weechat/irc -a server
 ```
 
 Once in Weechat, run `/secure passphrase ******`. The values in
