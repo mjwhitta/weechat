@@ -69,7 +69,7 @@ def simple_notify(title, message)
     if (RUBY_PLATFORM.match(/darwin/))
         system("terminal-notifier -title #{t} -message #{m}")
     else
-        system("notify-send -t 3000 -- #{t} #{m}")
+        system("notify-send -a weechat -- #{t} #{m}")
     end
 end
 
