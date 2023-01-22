@@ -1,7 +1,7 @@
 # How to use these configs
 
 ```
-$ git clone https://gitlab.com/mjwhitta/weechat $HOME/.weechat
+$ git clone https://github.com/mjwhitta/weechat $HOME/.weechat
 $ cd $HOME/.weechat
 $ mkdir -p configs/server
 $ cp samples/{irc,sec}.conf configs/server/
